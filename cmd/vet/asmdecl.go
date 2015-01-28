@@ -60,6 +60,7 @@ type asmVar struct {
 var (
 	asmArch386       = asmArch{"386", 4, 4, 4, false, "SP", false}
 	asmArchArm       = asmArch{"arm", 4, 4, 4, false, "R13", true}
+	asmArchArm64     = asmArch{"arm64", 8, 8, 8, false, "SP", true}
 	asmArchAmd64     = asmArch{"amd64", 8, 8, 8, false, "SP", false}
 	asmArchAmd64p32  = asmArch{"amd64p32", 4, 4, 8, false, "SP", false}
 	asmArchPower64   = asmArch{"power64", 8, 8, 8, true, "R1", true}
@@ -68,6 +69,7 @@ var (
 	arches = []*asmArch{
 		&asmArch386,
 		&asmArchArm,
+		&asmArchArm64,
 		&asmArchAmd64,
 		&asmArchAmd64p32,
 		&asmArchPower64,
@@ -84,7 +86,8 @@ var (
 	asmUnnamedFP = re(`[^+\-0-9]](([0-9]+)\(FP\))`)
 	asmSP        = re(`[^+\-0-9](([0-9]+)\(([A-Z0-9]+)\))`)
 	asmOpcode    = re(`^\s*(?:[A-Z0-9a-z_]+:)?\s*([A-Z]+)\s*([^,]*)(?:,\s*(.*))?`)
-	power64Suff  = re(`([BHWD])(ZU|Z|U|BR)?$`)
+	arm64Suff  = re(`([BHWD])(ZU|Z|U|BR)?$`)
+	power64Suff  = re(`([BHW])(U)?$`)
 )
 
 func asmCheck(pkg *Package) {
@@ -532,6 +535,8 @@ func asmCheckVar(badf func(string, ...interface{}), fn *asmFunc, line, expr stri
 		src = 2
 	case "arm.MOVB", "arm.MOVBU":
 		src = 1
+	case "arm64.MOV":
+		src = 8
 	// LEA* opcodes don't really read the second arg.
 	// They just take the address of it.
 	case "386.LEAL":
@@ -591,6 +596,19 @@ func asmCheckVar(badf func(string, ...interface{}), fn *asmFunc, line, expr stri
 					src = 4
 				case 'D':
 					src = 8
+				}
+			}
+		case "arm64":
+			// Strip standard suffixes to reveal size letter.
+			m := arm64Suff.FindStringSubmatch(op)
+			if m != nil {
+				switch m[1][0] {
+				case 'B':
+					src = 1
+				case 'H':
+					src = 2
+				case 'W':
+					src = 4
 				}
 			}
 		}
